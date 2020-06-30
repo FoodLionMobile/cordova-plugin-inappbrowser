@@ -34,7 +34,6 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Color;
 import android.graphics.Rect;
-import android.net.http.SslError;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -53,7 +52,6 @@ import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
-import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -700,8 +698,9 @@ public class InAppBrowser extends CordovaPlugin {
                 closeButtonColor = closeButtonColorSet;
             }
             String leftToRightSet = features.get(LEFT_TO_RIGHT);
-            leftToRight = leftToRightSet != null && leftToRightSet.equals("yes");
-
+            if (leftToRightSet != null) {
+                leftToRight = leftToRightSet.equals("yes") ? true : false;
+            }
             String toolbarColorSet = features.get(TOOLBAR_COLOR);
             if (toolbarColorSet != null) {
                 toolbarColor = android.graphics.Color.parseColor(toolbarColorSet);
@@ -1094,15 +1093,13 @@ public class InAppBrowser extends CordovaPlugin {
                     // The height is reduced by 1 pixel to correct 1 pixel dip error on high resolution/density devices
                     int reducedHeightDip = (int) ((float) bottomReduceHeightBy * displayMetrics.density) - 1;
 
-                    // Calculate visible display size necessary to determine the status bar height
+                    // Calculate visible display size
                     // Note that the visible display height differs from the device height by the status bar height if the device does not have a notch
                     // In devices with a notch, they are the same
                     Rect rectangle = new Rect();
                     cordova.getActivity().getWindow().getDecorView().getWindowVisibleDisplayFrame(rectangle);
 
-                    // Usable space height = screen height - (status bar height = device height - visible display height) - reduced height from the bottom
                     // Note that device height - visible display height is zero in devices with a notch, non zero on other devices
-                    //lp.height = displayMetrics.heightPixels - (displayMetrics.heightPixels - rectangle.height()) - reducedHeightDip;
                     lp.height = rectangle.height() - reducedHeightDip;
 
                     // Make sure the dialog is aligned to the bottom of the status bar as it is centered by default
@@ -1502,46 +1499,6 @@ public class InAppBrowser extends CordovaPlugin {
             } catch (JSONException ex) {
                 LOG.d(LOG_TAG, "Should never happen");
             }
-        }
-
-        @Override
-        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-            super.onReceivedSslError(view, handler, error);
-            try {
-                JSONObject obj = new JSONObject();
-                obj.put("type", LOAD_ERROR_EVENT);
-                obj.put("url", error.getUrl());
-                obj.put("code", 0);
-                obj.put("sslerror", error.getPrimaryError());
-                String message;
-                switch (error.getPrimaryError()) {
-                case SslError.SSL_DATE_INVALID:
-                    message = "The date of the certificate is invalid";
-                    break;
-                case SslError.SSL_EXPIRED:
-                    message = "The certificate has expired";
-                    break;
-                case SslError.SSL_IDMISMATCH:
-                    message = "Hostname mismatch";
-                    break;
-                default:
-                case SslError.SSL_INVALID:
-                    message = "A generic error occurred";
-                    break;
-                case SslError.SSL_NOTYETVALID:
-                    message = "The certificate is not yet valid";
-                    break;
-                case SslError.SSL_UNTRUSTED:
-                    message = "The certificate authority is not trusted";
-                    break;
-                }
-                obj.put("message", message);
-
-                sendUpdate(obj, true, PluginResult.Status.ERROR);
-            } catch (JSONException ex) {
-                LOG.d(LOG_TAG, "Should never happen");
-            }
-            handler.cancel();
         }
 
         /**
